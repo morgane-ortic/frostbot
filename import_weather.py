@@ -15,7 +15,8 @@ url = "https://api.open-meteo.com/v1/forecast"
 params = {
 	"latitude": 51.3396,
 	"longitude": 12.3713,
-	"hourly": "temperature_2m"
+	"hourly": "temperature_2m",
+    "timezone": "Europe/Berlin"
 }
 responses = openmeteo.weather_api(url, params=params)
 

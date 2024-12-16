@@ -157,7 +157,7 @@ dmypy.json
 .pytype/
 
 # sqlite cache
-.cache.sqlite*
+.cache.sqlite
 
 # Cython debug symbols
 cython_debug/

@@ -156,5 +156,8 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
+# sqlite cache
+.cache.sqlite*
+
 # Cython debug symbols
 cython_debug/

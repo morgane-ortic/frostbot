@@ -78,7 +78,7 @@ target/
 .ipynb_checkpoints
 
 # IPython
-profile_default/
+        '''Send a message if t/
 ipython_config.py
 
 # pyenv
@@ -161,3 +161,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+test.py
+test_2.py

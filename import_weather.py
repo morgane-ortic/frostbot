@@ -6,7 +6,7 @@ from retry_requests import retry
 
 
 def check_temp(timezone="Europe/Berlin"):
-
+	'''Get hourly temperatures for the given coordinates + time frame'''
 	# Setup the Open-Meteo API client with cache and retry on error
 	cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
 	retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
@@ -16,8 +16,10 @@ def check_temp(timezone="Europe/Berlin"):
 	# The order of variables in hourly or daily is important to assign them correctly below
 	url = "https://api.open-meteo.com/v1/forecast"
 	params = {
-		"latitude": 51.3396,
-		"longitude": 12.3713,
+		# "latitude": 51.3396,
+		# "longitude": 12.3713,
+		"latitude": 68.9713,
+		"longitude": 33.0809,
 		"hourly": "temperature_2m",
 		"forecast_days": 2,
 		"timezone": timezone
@@ -27,9 +29,8 @@ def check_temp(timezone="Europe/Berlin"):
 	# Process first location. Add a for-loop for multiple locations or weather models
 	response = responses[0]
 	print(f"Coordinates {response.Latitude()}°N {response.Longitude()}°E")
-	print(f"Elevation {response.Elevation()} m asl")
 	print(f"Timezone {response.Timezone()} {response.TimezoneAbbreviation()}")
-	print(f"Timezone difference to GMT+0 {response.UtcOffsetSeconds()} s")
+	print(f"Timezone difference to GMT+0 {response.UtcOffsetSeconds()} s\n")
 
 	# Process hourly data. The order of variables needs to be the same as requested.
 	hourly = response.Hourly()

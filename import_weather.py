@@ -5,8 +5,9 @@ import pandas as pd
 from retry_requests import retry
 
 
-def check_temp(timezone="Europe/Berlin"):
-	'''Get hourly temperatures for the given coordinates + time frame'''
+def check_temp(timezone="Europe/Berlin", latitude= 52.5237065, longitude=13.4446081):
+	'''Get hourly temperatures for the given coordinates + time frame
+	WARNING: If the passed values are invalid, the timezone and location will default to Berlin'''
 	# Setup the Open-Meteo API client with cache and retry on error
 	cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
 	retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
@@ -16,10 +17,8 @@ def check_temp(timezone="Europe/Berlin"):
 	# The order of variables in hourly or daily is important to assign them correctly below
 	url = "https://api.open-meteo.com/v1/forecast"
 	params = {
-		# "latitude": 51.3396,
-		# "longitude": 12.3713,
-		"latitude": 68.9713,
-		"longitude": 33.0809,
+		"latitude": latitude,
+		"longitude": longitude,
 		"hourly": "temperature_2m",
 		"forecast_days": 2,
 		"timezone": timezone

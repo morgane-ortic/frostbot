@@ -22,63 +22,44 @@ def init_bot():
     
 
 class FrostNotifier():
-    def __init__(self, timezone):
-        self.timezone = timezone
+    def __init__(self):
+        self.fetch_location_data()
 
-    def get_weekdays(self, num_days=7):
-        today = date.today()
-        self.weekdays = [
-            (today + timedelta(days=i)).strftime("%A")
-            for i in range(num_days)
-        ]
+
+    def fetch_location_data(self):
+        load_dotenv()
+        # You can either put the desired timezone, longitude and latitude in your local env file OR directly replace the following values
+        self.timezone = os.getenv('TIMEZONE')
+        self.latitude = os.getenv('LATITUDE')
+        self.longitude = os.getenv('LONGITUDE')
 
 
     def format_neg_temp(self, records):
+        treated_dates = []
+        self.formatted_temps = ''
         for record in records.values():
-            record['date'] = pd.to_datetime(record['date']).strftime('%A %d.%m %H:%M')
+            record['time'] = pd.to_datetime(record['date']).strftime('%H:%M')
             record['temperature_2m'] = round(record['temperature_2m'], 1)
-        return records
-    
-
-    def format_temp_list(self):
-        self.get_weekdays()
-        lines = self.frost_datetimes.split("\n")
-        seen_weekdays = []
-        formatted_lines = []
-
-        for line in lines:
-            if line.strip():  # Skip empty lines
-                weekday = line.split()[0]  # Extract the weekday (assumes it's the first word)
-                if weekday in self.weekdays:  # Check if the weekday is in self.weekdays
-                    if weekday in seen_weekdays:
-                        # Replace the weekday and the next 10 characters with spaces
-                        start_index = line.find(weekday)
-                        if start_index != -1:
-                            # Replace the substring (weekday + 10 characters after it)
-                            end_index = start_index + len(weekday) + 7
-                            line = line[:start_index] + "    " + line[end_index:]
-                    else:
-                        seen_weekdays.append(weekday)
-            formatted_lines.append(line)
-        self.frost_datetimes = "\n".join(formatted_lines)
+            record['date'] = pd.to_datetime(record['date']).strftime('%A %d.%m')
+            if record['date'] not in treated_dates:
+                treated_dates.append(record['date'])
+                self.formatted_temps += f'\n\n{record['date']}:\n\n'
+            self.formatted_temps += f'      {record['time']}: {record['temperature_2m']} °C\n'
 
 
     def check_frost(self):
         '''Get the temperatures and check whether they are below the reference temperature'''
-        self.frost_datetimes = ''
+        self.formatted_temps = ''
         # Get the DataFrame and reset the index to include it as a column
-        self.hourly_temp = check_temp(self.timezone).to_dict(orient='index')
+        self.hourly_temp = check_temp(self.timezone, self.latitude, self.longitude).to_dict(orient='index')
         reference_temp = 0 # in °C
         below_zero = {index: record for index, record in self.hourly_temp.items() if record['temperature_2m'] < reference_temp}
 
         if below_zero:
             result_1 = (f'Temperatures below {reference_temp} detected:')
             # Format the records
-            formatted_below_zero = self.format_neg_temp(below_zero)
-            for index, record in formatted_below_zero.items():
-                self.frost_datetimes += (f'{record['date']}: {record['temperature_2m']} °C\n')
-                self.format_temp_list()
-            print(f'{result_1}\n\n{self.frost_datetimes}')
+            self.format_neg_temp(below_zero)
+            print(f'{result_1}{self.formatted_temps}')
             self.send_warning()
         else:
             self.no_result = (f'No temperatures below {reference_temp} detected.')
@@ -94,7 +75,7 @@ class FrostNotifier():
 
         url = f"{homeserver}/_matrix/client/v3/rooms/{room_id}/send/m.room.message"
 
-        message = f"Frost warning in the next 48 hours!\n\n{self.frost_datetimes}"
+        message = f"Frost warning in the next 48 hours!{self.formatted_temps}"
         payload = {
             "msgtype": "m.text",
             "body": message
@@ -113,7 +94,7 @@ class FrostNotifier():
 
 
 def main():
-    frost_notifier = FrostNotifier('Europe/Berlin')
+    frost_notifier = FrostNotifier()
     frost_notifier.check_frost()
 
 if __name__ == '__main__':

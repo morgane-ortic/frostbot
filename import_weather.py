@@ -20,7 +20,7 @@ def check_temp(timezone="Europe/Berlin", latitude= 52.5237065, longitude=13.4446
 		"latitude": latitude,
 		"longitude": longitude,
 		"hourly": "temperature_2m",
-		"forecast_days": 2,
+		"forecast_days": 3,
 		"timezone": timezone
 	}
 	responses = openmeteo.weather_api(url, params=params)

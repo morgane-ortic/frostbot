@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import requests
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 from import_weather import check_temp
 
@@ -22,7 +22,9 @@ def init_bot():
     
 
 class FrostNotifier():
-    def __init__(self):
+    def __init__(self, loop_number, frost_detected):
+        self.loop_number = loop_number
+        self.frost_detected = frost_detected
         self.fetch_location_data()
 
 
@@ -34,10 +36,22 @@ class FrostNotifier():
         self.longitude = os.getenv('LONGITUDE')
 
 
-    def format_neg_temp(self, records):
+    def sort_temps(self):
+        '''keeps only freezing temperature in the next 48h'''
+        current_datetime = datetime.now().astimezone()
+        self.below_zero = {
+            index: record
+            for index, record in self.hourly_temp.items()
+            if record['temperature_2m'] < self.reference_temp
+            and pd.to_datetime(record['date']) - timedelta(seconds=3559) >= current_datetime
+            and pd.to_datetime(record['date']) <= current_datetime + timedelta(hours=47)
+        }
+
+
+    def format_neg_temp(self):
         treated_dates = []
         self.formatted_temps = ''
-        for record in records.values():
+        for record in self.below_zero.values():
             record['time'] = pd.to_datetime(record['date']).strftime('%H:%M')
             record['temperature_2m'] = round(record['temperature_2m'], 1)
             record['date'] = pd.to_datetime(record['date']).strftime('%A %d.%m')
@@ -52,18 +66,24 @@ class FrostNotifier():
         self.formatted_temps = ''
         # Get the DataFrame and reset the index to include it as a column
         self.hourly_temp = check_temp(self.timezone, self.latitude, self.longitude).to_dict(orient='index')
-        reference_temp = 0 # in °C
-        below_zero = {index: record for index, record in self.hourly_temp.items() if record['temperature_2m'] < reference_temp}
+        self.reference_temp = 0 # in °C
+        self.sort_temps()
 
-        if below_zero:
-            result_1 = (f'Temperatures below {reference_temp} detected:')
-            # Format the records
-            self.format_neg_temp(below_zero)
-            print(f'{result_1}{self.formatted_temps}')
-            self.send_warning()
+        if self.below_zero:
+            # Send warning only if no frost warning was sent in the last loop OR if 4 loops have already run
+            if self.frost_detected != True or loop_number >= 4:
+                self.frost_detected = True
+                result_1 = (f'Temperatures below {self.reference_temp} detected:')
+                # Format the records
+                self.sort_temps()
+                self.format_neg_temp()
+                print(f'{result_1}{self.formatted_temps}')
+                self.send_warning()
         else:
-            self.no_result = (f'No temperatures below {reference_temp} detected.')
+            self.frost_detected = False
+            self.no_result = (f'No temperatures below {self.reference_temp} detected.')
             print(self.no_result)
+        return (self.frost_detected)
     
 
     def send_warning(self):
@@ -93,11 +113,24 @@ class FrostNotifier():
             print(f"Failed to send message: {response.status_code}, {response.json()}")
 
 
-def main():
-    frost_notifier = FrostNotifier()
-    frost_notifier.check_frost()
+def main(loop_number, frost_detected):
+    frost_notifier = FrostNotifier(loop_number, frost_detected)
+    frost_detected = frost_notifier.check_frost()
+    return frost_detected
 
 if __name__ == '__main__':
+    loop_number = 0
+    frost_detected = False
+    print(f'''Number of loops: {loop_number}
+Frost detected = {frost_detected}
+          ''')
     while True:
-        main()
-        time.sleep(6 * 60 * 60)
+        frost_detected = main(loop_number, frost_detected)
+        loop_number += 1       
+        # Reinitialize loop count every 4 times (default = 6*4 = 24 h)
+        # If there was already a frost warning in the last 24 h, the next one will be sent 24 h later only
+        if loop_number > 4:
+            loop_number = 1            
+        # Defines how often to check temperatures in seconds
+        checking_interval = 6 * 60 * 60
+        time.sleep(checking_interval)

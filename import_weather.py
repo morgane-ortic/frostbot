@@ -44,5 +44,4 @@ def check_temp(timezone="Europe/Berlin", latitude= 52.5237065, longitude=13.4446
 	hourly_data["temperature_2m"] = hourly_temperature_2m
 
 	hourly_dataframe = pd.DataFrame(data = hourly_data)
-	
 	return hourly_dataframe

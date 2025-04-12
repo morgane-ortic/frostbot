@@ -38,13 +38,20 @@ class FrostNotifier():
 
     def sort_temps(self):
         '''keeps only freezing temperature in the next 48h'''
+        self.below_zero = ""
         current_datetime = datetime.now().astimezone()
+        time_limit = current_datetime + timedelta(hours=48)
+        print(f'Evaluating temperatures until{time_limit}\n')
+        print(f'The following temperatures are below the threshold:\n')
+        for index, record in self.hourly_temp.items():
+            if pd.to_datetime(record['date']) > time_limit:
+                print(pd.to_datetime(record['date']))
         self.below_zero = {
             index: record
             for index, record in self.hourly_temp.items()
             if record['temperature_2m'] < self.reference_temp
             and pd.to_datetime(record['date']) - timedelta(seconds=3559) >= current_datetime
-            and pd.to_datetime(record['date']) <= current_datetime + timedelta(hours=47)
+            and pd.to_datetime(record['date']) <= time_limit
         }
 
 
@@ -64,8 +71,14 @@ class FrostNotifier():
     def check_frost(self):
         '''Get the temperatures and check whether they are below the reference temperature'''
         self.formatted_temps = ''
-        # Get the DataFrame and reset the index to include it as a column
-        self.hourly_temp = check_temp(self.timezone, self.latitude, self.longitude).to_dict(orient='index')
+
+        # Get the DataFrame from the API
+        hourly_temp_df = check_temp(self.timezone, self.latitude, self.longitude)
+        # Convert the 'date' column to desired timezone
+        hourly_temp_df['date'] = pd.to_datetime(hourly_temp_df['date']).dt.tz_convert(self.timezone)
+        # Convert the DataFrame to a dictionary
+        self.hourly_temp = hourly_temp_df.to_dict(orient='index')
+
         self.reference_temp = 0 # in °C
         self.sort_temps()
 
@@ -73,21 +86,21 @@ class FrostNotifier():
             # Send warning only if no frost warning was sent in the last loop OR if 4 loops have already run
             if self.frost_detected != True or loop_number >= 4:
                 self.frost_detected = True
-                result_1 = (f'Temperatures below {self.reference_temp} detected:')
+                result_1 = (f'Temperatures below {self.reference_temp} °C detected:')
                 # Format the records
-                self.sort_temps()
                 self.format_neg_temp()
                 print(f'{result_1}{self.formatted_temps}')
                 self.send_warning()
         else:
             self.frost_detected = False
-            self.no_result = (f'No temperatures below {self.reference_temp} detected.')
+            self.no_result = (f'No temperatures below {self.reference_temp} °C detected.')
             print(self.no_result)
         return (self.frost_detected)
     
 
     def send_warning(self):
         '''Send a message if temperatures below the reference temperature are detected'''
+
         print('Sending a warning...')
         homeserver = os.getenv('HOMESERVER')
         access_token = os.getenv('ACCESS_TOKEN')
@@ -95,7 +108,7 @@ class FrostNotifier():
 
         url = f"{homeserver}/_matrix/client/v3/rooms/{room_id}/send/m.room.message"
 
-        message = f"Frost warning in the next 48 hours!{self.formatted_temps}"
+        message = f"Frost warning in the next 36 hours!{self.formatted_temps}"
         payload = {
             "msgtype": "m.text",
             "body": message
